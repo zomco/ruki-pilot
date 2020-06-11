@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
+# type: ignore
 
 import os
 from selfdrive.locationd.test import ublox
 from common import realtime
 from selfdrive.locationd.test.ubloxd import gen_raw, gen_solution
 import zmq
-import selfdrive.messaging as messaging
+import cereal.messaging as messaging
 
 
 unlogger = os.getenv("UNLOGGER") is not None   # debug prints
 
-def main(gctx=None):
+def main():
   poller = zmq.Poller()
 
   gpsLocationExternal = messaging.pub_sock('gpsLocationExternal')

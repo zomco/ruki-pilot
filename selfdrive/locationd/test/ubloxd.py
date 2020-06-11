@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 
 import os
 import serial
@@ -9,7 +10,7 @@ import struct
 import sys
 from cereal import log
 from common import realtime
-import selfdrive.messaging as messaging
+import cereal.messaging as messaging
 from selfdrive.locationd.test.ephemeris import EphemerisData, GET_FIELD_U
 
 panda = os.getenv("PANDA") is not None   # panda directly connected
@@ -20,7 +21,7 @@ print_dB = os.getenv("PRINT_DB") is not None     # print antenna dB
 timeout = 1
 dyn_model = 4 # auto model
 baudrate = 460800
-ports = ["/dev/ttyACM0","/dev/ttyACM1"]
+ports = ["/dev/ttyACM0", "/dev/ttyACM1"]
 rate = 100 # send new data every 100ms
 
 # which SV IDs we have seen and when we got iono
@@ -72,16 +73,17 @@ def configure_ublox(dev):
   dev.configure_poll(ublox.CLASS_CFG, ublox.MSG_CFG_NAVX5)
   dev.configure_poll(ublox.CLASS_CFG, ublox.MSG_CFG_ODO)
 
-  # Configure RAW and PVT messages to be sent every solution cycle
+  # Configure RAW, PVT and HW messages to be sent every solution cycle
   dev.configure_message_rate(ublox.CLASS_NAV, ublox.MSG_NAV_PVT, 1)
   dev.configure_message_rate(ublox.CLASS_RXM, ublox.MSG_RXM_RAW, 1)
   dev.configure_message_rate(ublox.CLASS_RXM, ublox.MSG_RXM_SFRBX, 1)
+  dev.configure_message_rate(ublox.CLASS_MON, ublox.MSG_MON_HW, 1)
 
 
 
 def int_to_bool_list(num):
   # for parsing bool bytes
-  return [bool(num & (1<<n)) for n in range(8)]
+  return [bool(num & (1 << n)) for n in range(8)]
 
 
 def gen_ephemeris(ephem_data):
@@ -132,9 +134,9 @@ def gen_solution(msg):
                                       msg_data['day'],
                                       msg_data['hour'],
                                       msg_data['min'],
-                                      msg_data['sec'])
-                 - datetime.datetime(1970,1,1)).total_seconds())*1e+03
-                 + msg_data['nano']*1e-06)
+                                      msg_data['sec']) -
+                 datetime.datetime(1970, 1, 1)).total_seconds())*1e+03 +
+                 msg_data['nano']*1e-06)
   gps_fix = {'bearing': msg_data['headMot']*1e-05,  # heading of motion in degrees
              'altitude': msg_data['height']*1e-03,  # altitude above ellipsoid
              'latitude': msg_data['lat']*1e-07,  # latitude in degrees
@@ -161,9 +163,9 @@ def gen_nav_data(msg, nav_frame_buffer):
 
   # parse GPS ephem
   gnssId = msg_meta_data['gnssId']
-  if gnssId  == 0:
-    svId =  msg_meta_data['svid']
-    subframeId =  GET_FIELD_U(measurements[1]['dwrd'], 3, 8)
+  if gnssId == 0:
+    svId = msg_meta_data['svid']
+    subframeId = GET_FIELD_U(measurements[1]['dwrd'], 3, 8)
     words = []
     for m in measurements:
       words.append(m['dwrd'])
@@ -222,6 +224,17 @@ def gen_raw(msg):
                 'measurements': measurements_parsed}}
   return log.Event.new_message(ubloxGnss=raw_meas)
 
+def gen_hw_status(msg):
+  msg_data = msg.unpack()[0]
+  ublox_hw_status = {'hwStatus': {
+    'noisePerMS': msg_data['noisePerMS'],
+    'agcCnt': msg_data['agcCnt'],
+    'aStatus': msg_data['aStatus'],
+    'aPower': msg_data['aPower'],
+    'jamInd': msg_data['jamInd']
+  }}
+  return log.Event.new_message(ubloxGnss=ublox_hw_status)
+
 def init_reader():
   port_counter = 0
   while True:
@@ -231,7 +244,7 @@ def init_reader():
       return dev
     except serial.serialutil.SerialException as e:
       print(e)
-      port_counter = (port_counter + 1)%len(ports)
+      port_counter = (port_counter + 1) % len(ports)
       time.sleep(2)
 
 def handle_msg(dev, msg, nav_frame_buffer):
@@ -252,20 +265,23 @@ def handle_msg(dev, msg, nav_frame_buffer):
       if nav is not None:
         nav.logMonoTime = int(realtime.sec_since_boot() * 1e9)
         ubloxGnss.send(nav.to_bytes())
-
+    elif msg.name() == 'MON_HW':
+      hw = gen_hw_status(msg)
+      hw.logMonoTime = int(realtime.sec_since_boot() * 1e9)
+      ubloxGnss.send(hw.to_bytes())
     else:
-      print("UNKNNOWN MESSAGE:", msg.name())
+      print("UNKNOWN MESSAGE:", msg.name())
   except ublox.UBloxError as e:
     print(e)
 
   #if dev is not None and dev.dev is not None:
   #  dev.close()
 
-def main(gctx=None):
+def main():
   global gpsLocationExternal, ubloxGnss
   nav_frame_buffer = {}
   nav_frame_buffer[0] = {}
-  for i in range(1,33):
+  for i in range(1, 33):
     nav_frame_buffer[0][i] = {}
 
 

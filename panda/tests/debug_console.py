@@ -28,7 +28,7 @@ if __name__ == "__main__":
 
       if os.getenv("BAUD") is not None:
         for panda in pandas:
-          panda.set_uart_baud(port_number, int(os.getenv("BAUD")))
+          panda.set_uart_baud(port_number, int(os.getenv("BAUD"))) # type: ignore
 
       while True:
         for i, panda in enumerate(pandas):
@@ -44,6 +44,6 @@ if __name__ == "__main__":
             if claim:
               panda.serial_write(port_number, ln)
           time.sleep(0.01)
-    except:
+    except Exception:
       print("panda disconnected!")
       time.sleep(0.5);

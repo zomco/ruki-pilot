@@ -3,9 +3,7 @@ import os
 os.environ['OLD_CAN'] = '1'
 os.environ['NOCRASH'] = '1'
 
-import time
 import unittest
-import shutil
 import matplotlib
 matplotlib.use('svg')
 
@@ -153,8 +151,8 @@ maneuvers = [
     initial_speed=30.,
     lead_relevancy=True,
     initial_distance_lead=49.,
-    speed_lead_values=[30.,30.,29.,31.,29.,31.,29.],
-    speed_lead_breakpoints=[0., 6., 8., 12.,16.,20.,24.],
+    speed_lead_values=[30., 30., 29., 31., 29., 31., 29.],
+    speed_lead_breakpoints=[0., 6., 8., 12., 16., 20., 24.],
     cruise_button_presses = [(CB.DECEL_SET, 1.2), (0, 1.3),
                              (CB.RES_ACCEL, 1.4), (0.0, 1.5),
                              (CB.RES_ACCEL, 1.6), (0.0, 1.7)],
@@ -166,7 +164,7 @@ maneuvers = [
     initial_speed=10.,
     lead_relevancy=True,
     initial_distance_lead=20.,
-    speed_lead_values=[10., 0., 0., 10., 0.,10.],
+    speed_lead_values=[10., 0., 0., 10., 0., 10.],
     speed_lead_breakpoints=[10., 20., 30., 40., 50., 60.],
     cruise_button_presses = [(CB.DECEL_SET, 1.2), (0, 1.3),
                              (CB.RES_ACCEL, 1.4), (0.0, 1.5),
@@ -329,15 +327,16 @@ class LongitudinalControl(unittest.TestCase):
 
     setup_output()
 
-    shutil.rmtree('/data/params', ignore_errors=True)
     params = Params()
+    params.clear_all()
     params.put("Passive", "1" if os.getenv("PASSIVE") else "0")
     params.put("OpenpilotEnabledToggle", "1")
+    params.put("CommunityFeaturesToggle", "1")
 
-    manager.gctx = {}
     manager.prepare_managed_process('radard')
     manager.prepare_managed_process('controlsd')
     manager.prepare_managed_process('plannerd')
+    manager.prepare_managed_process('dmonitoringd')
 
   @classmethod
   def tearDownClass(cls):
@@ -347,30 +346,39 @@ class LongitudinalControl(unittest.TestCase):
   def test_longitudinal_setup(self):
     pass
 
+
 def run_maneuver_worker(k):
   man = maneuvers[k]
   output_dir = os.path.join(os.getcwd(), 'out/longitudinal')
 
   def run(self):
     print(man.title)
-    manager.start_managed_process('radard')
-    manager.start_managed_process('controlsd')
-    manager.start_managed_process('plannerd')
+    valid = False
 
-    plot, valid = man.evaluate()
-    plot.write_plot(output_dir, "maneuver" + str(k+1).zfill(2))
+    for retries in range(3):
+      manager.start_managed_process('radard')
+      manager.start_managed_process('controlsd')
+      manager.start_managed_process('plannerd')
+      manager.start_managed_process('dmonitoringd')
 
-    manager.kill_managed_process('radard')
-    manager.kill_managed_process('controlsd')
-    manager.kill_managed_process('plannerd')
-    time.sleep(5)
+      plot, valid = man.evaluate()
+      plot.write_plot(output_dir, "maneuver" + str(k + 1).zfill(2))
+
+      manager.kill_managed_process('radard')
+      manager.kill_managed_process('controlsd')
+      manager.kill_managed_process('plannerd')
+      manager.kill_managed_process('dmonitoringd')
+
+      if valid:
+        break
 
     self.assertTrue(valid)
 
   return run
 
+
 for k in range(len(maneuvers)):
-  setattr(LongitudinalControl, "test_longitudinal_maneuvers_%d" % (k+1), run_maneuver_worker(k))
+  setattr(LongitudinalControl, "test_longitudinal_maneuvers_%d" % (k + 1), run_maneuver_worker(k))
 
 if __name__ == "__main__":
   unittest.main(failfast=True)

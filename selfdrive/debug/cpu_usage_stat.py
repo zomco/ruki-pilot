@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 import psutil
 import time
 import os
@@ -30,7 +31,7 @@ SLEEP_INTERVAL = 0.2
 
 monitored_proc_names = [
   'ubloxd', 'thermald', 'uploader', 'deleter', 'controlsd', 'plannerd', 'radard', 'mapd', 'loggerd' , 'logmessaged', 'tombstoned',
-  'logcatd', 'proclogd', 'boardd', 'pandad', './ui', 'calibrationd', 'params_learner', 'visiond', 'sensord', 'updated', 'gpsd', 'athena']
+  'logcatd', 'proclogd', 'boardd', 'pandad', './ui', 'ui',  'calibrationd', 'params_learner', 'modeld', 'dmonitoringmodeld', 'camerad', 'sensord', 'updated', 'gpsd', 'athena']
 cpu_time_names = ['user', 'system', 'children_user', 'children_system']
 
 timer = getattr(time, 'monotonic', time.time)
@@ -68,7 +69,7 @@ if __name__ == "__main__":
       k = ' '.join(p.cmdline())
       print('Add monitored proc:', k)
       stats[k] = {'cpu_samples': defaultdict(list), 'min': defaultdict(lambda: None), 'max': defaultdict(lambda: None),
-                  'avg': defaultdict(lambda: 0.0), 'last_cpu_times': None, 'last_sys_time':None}
+                  'avg': defaultdict(lambda: 0.0), 'last_cpu_times': None, 'last_sys_time': None}
       stats[k]['last_sys_time'] = timer()
       stats[k]['last_cpu_times'] = p.cpu_times()
       monitored_procs.append(p)

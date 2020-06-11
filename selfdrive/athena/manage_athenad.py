@@ -5,7 +5,7 @@ from multiprocessing import Process
 
 import selfdrive.crash as crash
 from common.params import Params
-from selfdrive.manager import launcher
+from selfdrive.launcher import launcher
 from selfdrive.swaglog import cloudlog
 from selfdrive.version import version, dirty
 
@@ -27,7 +27,7 @@ def main():
       proc.join()
       cloudlog.event("athenad exited", exitcode=proc.exitcode)
       time.sleep(5)
-  except:
+  except Exception:
     cloudlog.exception("manage_athenad.exception")
   finally:
     params.delete(ATHENA_MGR_PID_PARAM)
